@@ -328,21 +328,31 @@ function renderRecipients() {
   if (validSessions.length === 0) {
     list.innerHTML = '<div class="empty-state">未读取到真实会话昵称，请保持微信聊天首页可见，或先手动输入联系人发送</div>';
   } else {
-    list.innerHTML = validSessions.map((session) => {
-      const name = String(session?.name || '').trim();
-      const preview = String(session?.content || '').trim();
-      const target = name || preview;
-      const initial = target.charAt(0) || '#';
-      const selected = state.selectedRecipients.has(target);
-      return `<div class="recipient-item${selected ? ' selected' : ''}" data-target="${escapeHtml(target)}">
-        <div class="avatar">${escapeHtml(initial)}</div>
-        <div style="flex:1;min-width:0">
-          <div class="rec-name">${escapeHtml(target)}</div>
-          ${preview && preview !== target ? `<div class="rec-preview">${escapeHtml(preview)}</div>` : ''}
-        </div>
-        <div class="check-circle"></div>
-      </div>`;
-    }).join('');
+    const total = validSessions.length;
+    const selected = state.selectedRecipients.size;
+    const allSelected = selected >= total;
+
+    list.innerHTML = `
+      <div class="recipient-toolbar">
+        <span class="selected-count">已选 ${selected}/${total} 人</span>
+        <button class="btn btn-ghost btn-sm" onclick="toggleSelectAll()">${allSelected ? '取消全选' : '全选'}</button>
+      </div>
+      ${validSessions.map((session) => {
+        const name = String(session?.name || '').trim();
+        const preview = String(session?.content || '').trim();
+        const target = name || preview;
+        const initial = target.charAt(0) || '#';
+        const sel = state.selectedRecipients.has(target);
+        return `<div class="recipient-item${sel ? ' selected' : ''}" data-target="${escapeHtml(target)}">
+          <div class="avatar">${escapeHtml(initial)}</div>
+          <div style="flex:1;min-width:0">
+            <div class="rec-name">${escapeHtml(target)}</div>
+            ${preview && preview !== target ? `<div class="rec-preview">${escapeHtml(preview)}</div>` : ''}
+          </div>
+          <div class="check-circle"></div>
+        </div>`;
+      }).join('')}
+    `.trim();
 
     list.querySelectorAll('.recipient-item').forEach(item => {
       item.addEventListener('click', () => toggleRecipient(item.dataset.target, item));
@@ -350,6 +360,29 @@ function renderRecipients() {
   }
   list.classList.remove('hidden');
   updateSendInfo();
+}
+
+function toggleSelectAll() {
+  const validSessions = (state.sessions || []).filter(session => {
+    const name = String(session?.name || '').trim();
+    const preview = String(session?.content || '').trim();
+    return !!(name || preview);
+  });
+  const total = validSessions.length;
+  const selected = state.selectedRecipients.size;
+
+  // 如果已全选 → 取消全选；否则全选
+  if (selected >= total) {
+    state.selectedRecipients.clear();
+  } else {
+    validSessions.forEach(session => {
+      const target = String(session?.name || session?.content || '').trim();
+      if (target) state.selectedRecipients.add(target);
+    });
+  }
+
+  // 重新渲染列表（更新工具栏计数 + 每个 item 的 selected 状态）
+  renderRecipients();
 }
 
 function toggleRecipient(name, el) {
@@ -362,6 +395,22 @@ function toggleRecipient(name, el) {
     el.classList.add('selected');
   }
   updateSendInfo();
+  _updateRecipientToolbar();
+}
+
+function _updateRecipientToolbar() {
+  const toolbar = document.querySelector('.recipient-toolbar');
+  if (!toolbar) return;
+  const total = (state.sessions || []).filter(s => {
+    const n = String(s?.name || '').trim();
+    const p = String(s?.content || '').trim();
+    return !!(n || p);
+  }).length;
+  const selected = state.selectedRecipients.size;
+  const countEl = toolbar.querySelector('.selected-count');
+  const btn = toolbar.querySelector('.btn-sm');
+  if (countEl) countEl.textContent = `已选 ${selected}/${total} 人`;
+  if (btn) btn.textContent = selected >= total ? '取消全选' : '全选';
 }
 
 function escapeHtml(text) {
