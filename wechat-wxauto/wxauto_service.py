@@ -117,18 +117,12 @@ def enum_all(hwnd, _):
 
 win32gui.EnumWindows(enum_all, None)
 
+# 仅做窗口枚举检测，不激活/恢复任何窗口（避免弹窗和黑框）
+# 之前有 ShowWindow(SW_RESTORE) 已移除，因为：
+# 1. wxauto4 主路径不需要激活窗口
+# 2. UIA 降级路径直接从 HWND 读取控件树，也不需要窗口在前台
+# 3. 激活后台窗口会导致微信弹窗/表情面板/白框等 UI 问题
 restored = []
-for item in windows:
-    if item["class"] != "Chrome_WidgetWin_0":
-        continue
-    if item["width"] <= 300 or item["height"] <= 300:
-        continue
-    try:
-        win32gui.ShowWindow(item["hwnd"], win32con.SW_RESTORE)
-        win32gui.ShowWindow(item["hwnd"], win32con.SW_SHOW)
-        restored.append(item["hwnd"])
-    except Exception:
-        pass
 
 print(json.dumps({
     "ok": True,
@@ -178,7 +172,12 @@ def _format_init_error(exc):
 
 
 def _restore_wechat_window():
-    """尝试恢复正式微信主窗口。"""
+    """尝试恢复正式微信主窗口。
+    ⚠️ 仅当微信在前台时执行恢复操作，后台不激活窗口避免弹窗。"""
+    # 微信不在前台时不执行窗口操作
+    if not is_wechat_foreground():
+        return {"ok": False, "restored": [], "method": "skip_not_foreground"}
+
     titles = ["微信", "Weixin"]
     restored = []
     for title in titles:
@@ -431,6 +430,14 @@ def _get_sessions_via_wxauto():
     全程不还原/激活微信窗口，直接从 UIA 控件树读取，避免弹窗和表情面板。"""
     _debug_log('session_step=start(direct)')
 
+    # 记录前台窗口，wxauto4 WeChat 初始化可能激活窗口，结束后恢复
+    _prev_foreground = None
+    try:
+        import win32gui
+        _prev_foreground = win32gui.GetForegroundWindow()
+    except Exception:
+        pass
+
     def _init_and_get():
         """在同一 COM 线程内完成 WeChat 初始化 + 抓取会话"""
         try:
@@ -444,6 +451,14 @@ def _get_sessions_via_wxauto():
 
     _debug_log('session_step=wechat_init:start')
     raw = _run_with_timeout(_init_and_get, timeout=4.0, label='wechat_session')
+
+    # 恢复前台窗口（如果 wxauto4 抢走了焦点）
+    if _prev_foreground:
+        try:
+            import win32gui
+            win32gui.SetForegroundWindow(_prev_foreground)
+        except Exception:
+            pass
 
     result = []
     seen = set()
@@ -742,6 +757,17 @@ def get_sessions():
     优先使用 wxauto4 原生 GetSession（修复发送功能依赖），
     UIA-only 降级作为兜底。
     """
+
+    # === 前置检测：微信不在前台时不执行任何窗口操作 ===
+    if not is_wechat_foreground():
+        _debug_log('get_sessions blocked: wechat not in foreground')
+        return {
+            "success": False,
+            "stage": "foreground_blocked",
+            "can_manual_send": True,
+            "error": "微信窗口不在前台。请先将微信窗口置于前台（不要最小化或切到后台），再点击「加载会话列表」。你也可以直接手动输入联系人发送。"
+        }
+
     result = {"success": False, "sessions": [], "error": "", "stage": "init"}
 
     def _worker():
@@ -958,6 +984,9 @@ def check_status():
     foreground = is_wechat_foreground()
     if _wx_instance is None:
         return {"success": True, "online": False, "info": "未连接，点击「加载」连接微信", "foreground": foreground}
+    # 微信不在前台时不调用 IsOnline（避免意外激活弹窗）
+    if not foreground:
+        return {"success": True, "online": False, "foreground": False, "info": "微信不在前台，请先切换到微信窗口"}
     try:
         online = _wx_instance.IsOnline()
         return {"success": True, "online": online, "foreground": foreground, "info": "已连接" if online else "微信离线"}
