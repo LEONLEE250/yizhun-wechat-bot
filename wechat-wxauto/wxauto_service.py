@@ -36,8 +36,17 @@ except Exception:
 from wxauto4 import WeChat
 
 # 配置（跨电脑兼容：先试 C:\Python312，再试环境变量，最后用系统 python）
-_DEFAULT_PY = r'C:\Python312\python.exe'
-PYTHON_PATH = _DEFAULT_PY if os.path.exists(_DEFAULT_PY) else (os.environ.get('YIZHUN_PYTHON') or os.environ.get('PYTHON') or 'python')
+# 优先用 pythonw（无控制台窗口），避免弹黑框
+_DEFAULT_PY = r'C:\Python312\pythonw.exe'
+if not os.path.exists(_DEFAULT_PY):
+    _DEFAULT_PY = r'C:\Python312\python.exe'
+_PY_PATH = _DEFAULT_PY if os.path.exists(_DEFAULT_PY) else (os.environ.get('YIZHUN_PYTHON') or os.environ.get('PYTHON') or 'python')
+# 如果 YIZHUN_PYTHON/PYTHON 指向 python.exe，尝试同级 pythonw.exe
+if _PY_PATH.endswith('python.exe'):
+    _PYW_PATH = _PY_PATH.replace('python.exe', 'pythonw.exe')
+    if os.path.exists(_PYW_PATH):
+        _PY_PATH = _PYW_PATH
+PYTHON_PATH = _PY_PATH
 WORK_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(WORK_DIR, "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -391,13 +400,8 @@ def _run_with_timeout(fn, timeout=5.0, default=None, label='task'):
 def _get_sessions_via_wxauto():
     """优先使用 wxauto4 原生 GetSession。
     注意：不使用全局 _wx_instance，避免 COM 对象跨线程导致 CoInitialize 错误。
-    如果微信处于最小化/后台状态，先温和还原窗口（不做坐标点击），再读取会话。"""
-    # 检查微信窗口状态，如果最小化则温和还原（不做坐标点击）
-    if _is_wechat_minimized():
-        _debug_log('session_step=restore_wechat_gentle')
-        _restore_wechat_window()
-        time.sleep(0.5)
-    _debug_log('session_step=ready(wxauto)')
+    全程不还原/激活微信窗口，直接从 UIA 控件树读取，避免弹窗和表情面板。"""
+    _debug_log('session_step=start(direct)')
 
     def _init_and_get():
         """在同一 COM 线程内完成 WeChat 初始化 + 抓取会话"""
