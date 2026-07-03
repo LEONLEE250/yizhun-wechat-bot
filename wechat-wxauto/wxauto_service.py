@@ -250,7 +250,8 @@ def _parse_session_cell_text(raw_text):
 
 
 def _activate_wechat_session_tab():
-    """通过坐标点击左侧聊天页签，避免 wxauto4 初始化时找不到“微信”按钮。"""
+    """激活微信聊天标签页，准备读取会话列表。
+    优先用 UIA 定位「微信」按钮点击（不移动鼠标），失败再回退到坐标点击。"""
     try:
         import win32con
         import win32gui
@@ -272,8 +273,24 @@ def _activate_wechat_session_tab():
             return False
 
         win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-        time.sleep(0.8)
+        time.sleep(0.5)
+        win32gui.SetForegroundWindow(hwnd)
+        time.sleep(0.3)
 
+        # —— 方案1: UIA 定位「微信」按钮 Click（不移动鼠标，不干扰用户操作）——
+        try:
+            from wxauto4.uia import uiautomation as auto
+            root = auto.ControlFromHandle(hwnd)
+            for control, _depth in auto.WalkControl(root, includeTop=True, maxDepth=10):
+                if (getattr(control, "ClassName", "") == "mmui::XTabBarItem"
+                        and getattr(control, "Name", "") == "微信"):
+                    control.Click(simulateMove=False)
+                    time.sleep(0.8)
+                    return True
+        except Exception:
+            pass
+
+        # —— 方案2: 坐标点击（兜底）——
         left, top, right, bottom = win32gui.GetWindowRect(hwnd)
         width = right - left
         height = bottom - top
