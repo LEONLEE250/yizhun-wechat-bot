@@ -257,30 +257,53 @@ def _is_wechat_minimized():
 
 
 def is_wechat_foreground():
-    """检测微信主窗口当前是否在前台（避免后台触发弹窗）。"""
+    """检测微信是否处于当前前台窗口（避免后台触发弹窗）。"""
     try:
-        import win32gui, win32process
-        # 获取当前前台窗口
+        import win32gui
+        import win32process
+        import psutil
+
         foreground_hwnd = win32gui.GetForegroundWindow()
         if not foreground_hwnd:
             return False
+
         _, pid = win32process.GetWindowThreadProcessId(foreground_hwnd)
-        # 检查前台窗口是否属于微信进程
-        import psutil
-        for p in psutil.process_iter(['pid', 'name']):
-            name = (p.info.get('name') or '').lower()
-            if p.info['pid'] == pid and name == 'weixin.exe':
-                # 进一步确认是微信主窗口（非小窗）
-                cls = win32gui.GetClassName(foreground_hwnd)
-                rect = win32gui.GetWindowRect(foreground_hwnd)
-                width = rect[2] - rect[0]
-                height = rect[3] - rect[1]
-                if cls in ("Chrome_WidgetWin_0", "Qt51514QWindowIcon", "mmui::MainWindow") and width > 300 and height > 300:
-                    return True
-                return False
-        return False
+
+        # 获取前台进程名与路径
+        proc_name = ""
+        proc_exe = ""
+        try:
+            proc = psutil.Process(pid)
+            proc_name = (proc.name() or "").lower()
+            proc_exe = (proc.exe() or "").lower()
+        except Exception:
+            # 直接按 pid 迭代兜底
+            for p in psutil.process_iter(["pid", "name", "exe"]):
+                if p.info.get("pid") == pid:
+                    proc_name = (p.info.get("name") or "").lower()
+                    proc_exe = (p.info.get("exe") or "").lower()
+                    break
+
+        # 判断是否为微信进程（兼容 weixin.exe / WeChat.exe 等）
+        is_wechat = (
+            proc_name in ("weixin.exe", "wechat.exe")
+            or "weixin" in proc_exe
+            or "wechat" in proc_exe
+            or "tencent\\xwechat" in proc_exe
+        )
+        if not is_wechat:
+            return False
+
+        # 排除托盘小窗等极小窗口
+        rect = win32gui.GetWindowRect(foreground_hwnd)
+        width = rect[2] - rect[0]
+        height = rect[3] - rect[1]
+        if width < 150 or height < 150:
+            return False
+
+        return True
     except Exception:
-        # 不确定时默认返回 True（走正常流程）
+        # 不确定时按「在前台」处理，避免误拦截正常群发
         return True
 
 
