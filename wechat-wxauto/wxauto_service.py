@@ -664,17 +664,6 @@ def broadcast_image(targets, image_path, message=None, interval=0.8, prefer_manu
 # 会话管理
 # ============================================================
 
-def _cleanup_wechat_ui():
-    """关闭微信里可能残留的表情/菜单面板，避免阻塞用户操作。"""
-    try:
-        for _ in range(3):
-            pyautogui.keyDown('esc')
-            pyautogui.keyUp('esc')
-            time.sleep(0.05)
-    except Exception as e:
-        _debug_log(f'_cleanup_wechat_ui error: {e}')
-
-
 def get_sessions():
     """获取当前聊天会话列表"""
     result = {"success": False, "sessions": [], "error": "", "stage": "init"}
@@ -703,7 +692,6 @@ def get_sessions():
             result["error"] = str(e)
             _debug_log(f'get_sessions error stage={result.get("stage")} error={e}')
         finally:
-            _cleanup_wechat_ui()
             pythoncom.CoUninitialize()
 
     t = threading.Thread(target=_worker, daemon=True)
