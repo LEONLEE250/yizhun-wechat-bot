@@ -716,18 +716,12 @@ def get_sessions():
     def _worker():
         pythoncom.CoInitialize()
         try:
-            result["stage"] = "wxauto"
-            _debug_log('get_sessions worker start: wxauto')
-            try:
-                sessions = _get_sessions_via_wxauto()
-            except Exception as e:
-                _debug_log(f'get_sessions wxauto failed: {e}')
-                result["wxauto_error"] = str(e)
-                result["stage"] = "uia_fallback"
-                sessions = _get_sessions_from_main_window()
+            result["stage"] = "uia_only"
+            _debug_log('get_sessions start: uia_only (skip wxauto4)')
+            sessions = _get_sessions_from_main_window()
             if not sessions:
-                result["stage"] = "uia_fallback"
-                _debug_log('get_sessions fallback start: uia')
+                result["stage"] = "uia_only_retry"
+                _debug_log('get_sessions retry: uia')
                 sessions = _get_sessions_from_main_window()
             result["success"] = True
             result["sessions"] = sessions
