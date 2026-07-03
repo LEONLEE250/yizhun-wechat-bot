@@ -247,7 +247,25 @@ async function loadSessions() {
   const list = document.getElementById('recipientList');
   list.classList.remove('hidden');
   list.innerHTML = '<div class="empty-state">正在读取微信会话列表...</div>';
-  
+
+  // === 前置检测：微信窗口是否在前台 ===
+  try {
+    const statusRes = await apiFetch(`${API}/api/status`);
+    const statusData = await statusRes.json();
+    if (statusData.wx_foreground === false) {
+      list.innerHTML = '<div class="empty-state" style="color:var(--accent)">⚠️ 请先将微信窗口置于前台（不要最小化或切到后台），再点击「加载会话列表」</div>';
+      toast('请先将微信窗口置于前台，再加载会话列表');
+      // 同时更新状态指示器
+      const _dot = document.querySelector('.status-dot');
+      const _txt = document.getElementById('statusText');
+      if (_dot) _dot.classList.add('off');
+      if (_txt) _txt.textContent = '微信不在前台，请先切到前台';
+      return;
+    }
+  } catch (_) {
+    // 状态检测失败，不阻塞加载流程，让后续逻辑处理
+  }
+
   // 最多尝试2次（首次超时可重试）
   for (let attempt = 1; attempt <= 2; attempt++) {
     if (attempt > 1) {
@@ -947,6 +965,12 @@ async function checkWxStatus() {
     if (data.success === false) {
       dot.classList.add('off');
       text.textContent = data.info || '后端已启动，微信状态读取失败，但仍可手动输入联系人直接发送';
+      return;
+    }
+    // 如果微信不在前台，提示用户
+    if (data.wx_foreground === false) {
+      dot.classList.add('off');
+      text.textContent = '微信未在前台，请先切到微信窗口';
       return;
     }
     if (data.online) {

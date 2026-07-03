@@ -257,6 +257,34 @@ def _is_wechat_minimized():
         return False
 
 
+def is_wechat_foreground():
+    """检测微信主窗口当前是否在前台（避免后台触发弹窗）。"""
+    try:
+        import win32gui, win32process
+        # 获取当前前台窗口
+        foreground_hwnd = win32gui.GetForegroundWindow()
+        if not foreground_hwnd:
+            return False
+        _, pid = win32process.GetWindowThreadProcessId(foreground_hwnd)
+        # 检查前台窗口是否属于微信进程
+        import psutil
+        for p in psutil.process_iter(['pid', 'name']):
+            name = (p.info.get('name') or '').lower()
+            if p.info['pid'] == pid and name == 'weixin.exe':
+                # 进一步确认是微信主窗口（非小窗）
+                cls = win32gui.GetClassName(foreground_hwnd)
+                rect = win32gui.GetWindowRect(foreground_hwnd)
+                width = rect[2] - rect[0]
+                height = rect[3] - rect[1]
+                if cls in ("Chrome_WidgetWin_0", "Qt51514QWindowIcon", "mmui::MainWindow") and width > 300 and height > 300:
+                    return True
+                return False
+        return False
+    except Exception:
+        # 不确定时默认返回 True（走正常流程）
+        return True
+
+
 def _parse_session_cell_text(raw_text):
     lines = [line.strip() for line in (raw_text or "").splitlines() if line.strip()]
     if not lines:
@@ -710,23 +738,43 @@ def broadcast_image(targets, image_path, message=None, interval=0.8, prefer_manu
 # ============================================================
 
 def get_sessions():
-    """获取当前聊天会话列表"""
+    """获取当前聊天会话列表
+    优先使用 wxauto4 原生 GetSession（修复发送功能依赖），
+    UIA-only 降级作为兜底。
+    """
     result = {"success": False, "sessions": [], "error": "", "stage": "init"}
 
     def _worker():
         pythoncom.CoInitialize()
         try:
-            result["stage"] = "uia_only"
-            _debug_log('get_sessions start: uia_only (skip wxauto4)')
+            # 方案1: wxauto4 原生 GetSession（主路径）
+            result["stage"] = "wxauto"
+            _debug_log('get_sessions start: wxauto primary')
+            try:
+                sessions = _get_sessions_via_wxauto()
+                if sessions:
+                    result["success"] = True
+                    result["sessions"] = sessions
+                    result["stage"] = "done"
+                    _debug_log(f'get_sessions wxauto success count={len(sessions)}')
+                    return
+                _debug_log('get_sessions wxauto returned empty, trying UIA fallback')
+            except Exception as e:
+                result["wxauto_error"] = str(e)
+                _debug_log(f'get_sessions wxauto failed: {e}, trying UIA fallback')
+
+            # 方案2: UIA 控件树读取（兜底）
+            result["stage"] = "uia_fallback"
+            _debug_log('get_sessions uia fallback start')
             sessions = _get_sessions_from_main_window()
             if not sessions:
-                result["stage"] = "uia_only_retry"
-                _debug_log('get_sessions retry: uia')
+                result["stage"] = "uia_fallback_retry"
+                _debug_log('get_sessions uia fallback retry')
                 sessions = _get_sessions_from_main_window()
             result["success"] = True
             result["sessions"] = sessions
             result["stage"] = "done"
-            _debug_log(f'get_sessions success count={len(sessions)}')
+            _debug_log(f'get_sessions uia success count={len(sessions)}')
         except Exception as e:
             result["error"] = str(e)
             _debug_log(f'get_sessions error stage={result.get("stage")} error={e}')
@@ -907,14 +955,15 @@ def cancel_scheduled_task(task_id):
 def check_status():
     """检查微信是否在线"""
     global _wx_instance
+    foreground = is_wechat_foreground()
     if _wx_instance is None:
-        return {"success": True, "online": False, "info": "未连接，点击「加载」连接微信"}
+        return {"success": True, "online": False, "info": "未连接，点击「加载」连接微信", "foreground": foreground}
     try:
         online = _wx_instance.IsOnline()
-        return {"success": True, "online": online, "info": "已连接" if online else "微信离线"}
+        return {"success": True, "online": online, "foreground": foreground, "info": "已连接" if online else "微信离线"}
     except Exception:
         _wx_instance = None
-        return {"success": True, "online": False, "info": "连接断开，请重新加载"}
+        return {"success": True, "online": False, "foreground": foreground, "info": "连接断开，请重新加载"}
 
 
 # ============================================================

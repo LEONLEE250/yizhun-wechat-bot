@@ -25,7 +25,7 @@ app = Flask(__name__)
 CORS(app)
 
 # ── 应用标识 ──────────────────────────────────────────
-APP_VERSION = "4.1.0"
+APP_VERSION = "4.1.1"
 APP_CHANNEL = "preview"
 APP_PORT = 5680
 APP_STARTED_AT = time.time()
@@ -127,12 +127,14 @@ def api_status():
         return jsonify({
             "success": True,
             "wx_online": status.get("online", False),
+            "wx_foreground": status.get("foreground", True),
             "info": status.get("info", "未知状态")
         })
     except Exception as e:
         return jsonify({
             "success": False,
             "wx_online": False,
+            "wx_foreground": True,
             "info": f"微信状态读取失败: {str(e)}"
         })
 
