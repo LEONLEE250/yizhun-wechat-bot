@@ -265,6 +265,10 @@ async function loadSessions() {
         const _txt = document.getElementById('statusText');
         _dot.classList.remove('off');
         _txt.textContent = '微信已连接 ✓';
+        // 把应用主窗口调回前台（微信被短暂激活后）
+        if (window.electronAPI && window.electronAPI.focusMainWindow) {
+          window.electronAPI.focusMainWindow();
+        }
         if (!state.sessions.length) {
           toast('未读取到真实会话昵称，请先把微信停在聊天首页并保持窗口可见');
         }

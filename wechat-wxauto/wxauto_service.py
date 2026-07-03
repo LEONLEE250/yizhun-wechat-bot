@@ -227,6 +227,27 @@ def _focus_weixin_main_window():
     return info
 
 
+def _is_wechat_minimized():
+    """检查微信主窗口是否处于最小化/后台状态。"""
+    try:
+        import win32gui, win32process
+        info = _inspect_wechat_windows()
+        if not isinstance(info, dict) or not info.get("ok"):
+            return False  # 不确定时走正常流程
+        for w in info.get("windows", []):
+            if w.get("width", 0) > 300 and w.get("height", 0) > 300:
+                if w.get("class") in ("Qt51514QWindowIcon", "mmui::MainWindow", "Chrome_WidgetWin_0"):
+                    # 如果窗口被最小化，其 visiable 仍然可能为 True
+                    # 通过检查 rect 在屏幕外或大小为 0 判断
+                    rx, ry, rw, rh = w.get("rect", [0, 0, 0, 0])
+                    if rw <= 0 or rh <= 0:
+                        return True
+                    return False
+        return True
+    except Exception:
+        return False
+
+
 def _parse_session_cell_text(raw_text):
     lines = [line.strip() for line in (raw_text or "").splitlines() if line.strip()]
     if not lines:
@@ -370,8 +391,13 @@ def _run_with_timeout(fn, timeout=5.0, default=None, label='task'):
 def _get_sessions_via_wxauto():
     """优先使用 wxauto4 原生 GetSession。
     注意：不使用全局 _wx_instance，避免 COM 对象跨线程导致 CoInitialize 错误。
-    改为不激活微信窗口，直接初始化 wxauto4 读取会话列表，避免弹窗和触发表情面板。"""
-    _debug_log('session_step=skip_activation(safe)')
+    如果微信处于最小化/后台状态，先温和还原窗口（不做坐标点击），再读取会话。"""
+    # 检查微信窗口状态，如果最小化则温和还原（不做坐标点击）
+    if _is_wechat_minimized():
+        _debug_log('session_step=restore_wechat_gentle')
+        _restore_wechat_window()
+        time.sleep(0.5)
+    _debug_log('session_step=ready(wxauto)')
 
     def _init_and_get():
         """在同一 COM 线程内完成 WeChat 初始化 + 抓取会话"""

@@ -83,4 +83,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   platformPublishShipinhao: (data) => ipcRenderer.invoke('platform:publish-shipinhao', data),
   onPlatformQRCode: (callback) => ipcRenderer.on('platform:qrcode', (event, data) => callback(data)),
   onPlatformLog: (callback) => ipcRenderer.on('platform:log', (event, data) => callback(data)),
+  focusMainWindow: () => ipcRenderer.send('focus-main-window'),
 });

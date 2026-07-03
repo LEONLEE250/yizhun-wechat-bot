@@ -205,6 +205,14 @@ function startBackend() {
   });
 }
 
+// ── IPC: 聚焦主窗口（会话加载后把应用窗口调回前台）──
+ipcMain.on('focus-main-window', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
 // ── IPC: 暴露 runtime meta 给渲染进程 ─────────────────────
 
 function createWindow() {
