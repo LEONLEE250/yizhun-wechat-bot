@@ -989,7 +989,7 @@ class MomentPublisher:
         
         if not json_output:
             print("=" * 60)
-            print("壹准AI营销助手 — 朋友圈发布 v9")
+            print("多账号分发助手（壹准AI营销助手beta） — 朋友圈发布 v9")
             print("=" * 60)
         
         try:
@@ -1072,7 +1072,7 @@ class MomentPublisher:
 # ====== 命令行入口 ======
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="壹准AI营销助手 — 朋友圈发布 v9",
+        description="多账号分发助手（壹准AI营销助手beta） — 朋友圈发布 v9",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:

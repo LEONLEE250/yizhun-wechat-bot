@@ -755,7 +755,7 @@ def api_cancel_moment_task(task_id):
 
 if __name__ == '__main__':
     print("=" * 50)
-    print(f"  壹准AI营销助手 - 后端服务 v{APP_VERSION}")
+    print(f"  多账号分发助手（壹准AI营销助手beta） - 后端服务 v{APP_VERSION}")
     print(f"  http://localhost:{APP_PORT}")
     print(f"  channel: {APP_CHANNEL}")
     print("=" * 50)
