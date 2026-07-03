@@ -214,7 +214,7 @@ function createWindow() {
     minWidth: 860,
     minHeight: 600,
     frame: false,
-    title: '多账号分发助手（壹准AI营销助手beta）',
+    title: '壹准多平台分发助手(AI营销助手beta)',
     titleBarStyle: 'hidden',
     backgroundColor: '#f5f5f7',
     webPreferences: {
@@ -967,7 +967,7 @@ function createWindow() {
   // 下载更新包（断点续传 + DNS预解析 + 速度显示 + 长超时）
   ipcMain.handle('download-update', async (event, downloadUrl) => {
     const downloadsDir = app.getPath('downloads');
-    const fileName = '多账号分发助手（壹准AI营销助手beta）_Setup.exe';
+    const fileName = '壹准多平台分发助手(AI营销助手beta)_Setup.exe';
     const filePath = path.join(downloadsDir, fileName);
 
     const send = (data) => mainWindow.webContents.send('download-progress', data);

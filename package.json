@@ -1,7 +1,7 @@
 {
   "name": "yizhun-wechat-bot",
   "version": "4.1.0",
-  "description": "多账号分发助手（壹准AI营销助手beta） - 微信群发 + AI文案 + 定时发送 + 朋友圈",
+  "description": "壹准多平台分发助手(AI营销助手beta) - 微信群发 + AI文案 + 定时发送 + 朋友圈",
   "main": "frontend/main.js",
   "scripts": {
     "start": "electron .",
@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "com.yizhun.wechat-bot.preview",
-    "productName": "多账号分发助手（壹准AI营销助手beta）",
+    "productName": "壹准多平台分发助手(AI营销助手beta)",
     "directories": {
       "output": "build"
     },
