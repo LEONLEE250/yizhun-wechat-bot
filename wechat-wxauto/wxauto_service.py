@@ -369,10 +369,9 @@ def _run_with_timeout(fn, timeout=5.0, default=None, label='task'):
 
 def _get_sessions_via_wxauto():
     """优先使用 wxauto4 原生 GetSession。
-    注意：不使用全局 _wx_instance，避免 COM 对象跨线程导致 CoInitialize 错误。"""
-    _debug_log('session_step=activate_tab:start')
-    _activate_wechat_session_tab()
-    _debug_log('session_step=activate_tab:done')
+    注意：不使用全局 _wx_instance，避免 COM 对象跨线程导致 CoInitialize 错误。
+    改为不激活微信窗口，直接初始化 wxauto4 读取会话列表，避免弹窗和触发表情面板。"""
+    _debug_log('session_step=skip_activation(safe)')
 
     def _init_and_get():
         """在同一 COM 线程内完成 WeChat 初始化 + 抓取会话"""
@@ -429,9 +428,8 @@ def _get_sessions_from_main_window():
         raise RuntimeError("未检测到可用的微信主窗口")
 
     hwnd = candidates[0]["hwnd"]
-    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-    win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
-    time.sleep(0.8)
+    # 不激活/还原窗口，直接从 HWND 遍历 UIA 控件树，避免弹窗
+    time.sleep(0.3)
 
     root = auto.ControlFromHandle(hwnd)
     found_session_cell = False
