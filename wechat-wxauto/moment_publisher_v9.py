@@ -182,20 +182,29 @@ class MomentPublisher:
         time.sleep(0.3)
         
         # 通过 UIA 精准查找侧边栏中的「朋友圈」按钮，避免坐标偏移误触
+        # ⚠️ 不能限制 ControlTypeName——不同微信版本下侧边栏按钮的类型不同
+        # (ButtonControl / ListItemControl / TextControl / PaneControl 都可能)
+        # 只按 Name='朋友圈' 匹配，然后验证位置是否合理（在窗口左半侧、中部偏上）
         r = wx['rect']
         moments_btn = None
         try:
             ctrl = auto.ControlFromHandle(wx['hwnd'])
             def find_moments(c, depth=0):
-                if depth > 6:
+                if depth > 8:
                     return None
                 try:
                     n = (c.Name or '').strip()
-                    if n == '朋友圈' and c.ControlTypeName == 'ButtonControl':
+                    if n == '朋友圈':
                         rect = c.BoundingRectangle
                         if rect:
-                            return (int(rect.left + rect.width()/2),
-                                    int(rect.top + rect.height()/2))
+                            cx = int(rect.left + rect.width()/2)
+                            cy = int(rect.top + rect.height()/2)
+                            # 额外验证：朋友圈按钮应在窗口左半侧（x<窗口中心）
+                            # 且不在顶部标题栏区域（y>窗口顶+50）
+                            win_w = r[2] - r[0]
+                            win_h = r[3] - r[1]
+                            if cx < r[0] + win_w * 0.3 and cy > r[1] + 50:
+                                return (cx, cy)
                     for child in c.GetChildren():
                         res = find_moments(child, depth+1)
                         if res:
@@ -212,10 +221,14 @@ class MomentPublisher:
             print(f"  朋友圈按钮 (UIA): ({cx},{cy})")
             pyautogui.click(cx, cy)
         else:
-            # UIA 未找到，回退到 DPI 自适应坐标（实际侧边栏 y 偏移）
+            # UIA 未找到，回退到 DPI 自适应坐标
+            # 水平位置：窗口宽度 × 5%（侧边栏中心），比固定 +30 更鲁棒
             y_off = _sidebar_moments_offset()
-            print(f"  UIA 未找到，回退到坐标: x={r[0]+30}, y={r[1]+y_off}")
-            pyautogui.click(r[0] + 30, r[1] + y_off)
+            win_w = r[2] - r[0]
+            fx = r[0] + int(win_w * 0.05)
+            fy = r[1] + y_off
+            print(f"  UIA 未找到，回退到坐标: x={fx}, y={fy}")
+            pyautogui.click(fx, fy)
         time.sleep(1.5)
         
         # 验证朋友圈窗口出现
